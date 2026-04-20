@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HSV Threshold Tuner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; background: #fafaf8; color: #334155; padding: 24px; }
+  h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  p  { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+
+  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 24px; }
+
+  .controls { display: flex; flex-direction: column; gap: 16px; }
+
+  .slider-group { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; }
+  .slider-group h3 { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+
+  .slider-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .slider-row:last-child { margin-bottom: 0; }
+  .slider-label { display: flex; justify-content: space-between; font-size: 12px; color: #475569; }
+  .slider-label span { font-size: 12px; color: #0f172a; font-weight: 600; }
+  input[type=range] { width: 100%; height: 4px; accent-color: #6366f1; }
+
+  .code-box { background: #1e293b; border-radius: 8px; padding: 14px; font-size: 11px; color: #94a3b8; line-height: 1.7; }
+  .code-box .var { color: #7dd3fc; }
+  .code-box .val { color: #86efac; }
+  .code-box .kw  { color: #c084fc; }
+
+  .canvases { display: flex; flex-direction: column; gap: 12px; }
+  canvas { border-radius: 6px; border: 1px solid #e2e8f0; width: 100%; display: block; }
+  .canvas-label { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+
+  .coverage { font-size: 13px; color: #334155; margin-top: 8px; }
+  .coverage span { font-weight: 600; color: #166534; }
+
+  .tip { background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #166534; margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>HSV Threshold Tuner</h1>
+<p>Adjust the sliders to isolate an object by color. See Chapter 2 for the theory.</p>
+
+<div class="layout">
+  <div class="controls">
+    <div class="slider-group">
+      <h3>Hue range (0 to 179)</h3>
+      <div class="slider-row">
+        <div class="slider-label">H min <span id="hmin-v">10</span></div>
+        <input type="range" id="hmin" min="0" max="179" value="10">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">H max <span id="hmax-v">30</span></div>
+        <input type="range" id="hmax" min="0" max="179" value="30">
+      </div>
+    </div>
+
+    <div class="slider-group">
+      <h3>Saturation range (0 to 255)</h3>
+      <div class="slider-row">
+        <div class="slider-label">S min <span id="smin-v">50</span></div>
+        <input type="range" id="smin" min="0" max="255" value="50">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">S max <span id="smax-v">255</span></div>
+        <input type="range" id="smax" min="0" max="255" value="255">
+      </div>
+    </div>
+
+    <div class="slider-group">
+      <h3>Value range (0 to 255)</h3>
+      <div class="slider-row">
+        <div class="slider-label">V min <span id="vmin-v">50</span></div>
+        <input type="range" id="vmin" min="0" max="255" value="50">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">V max <span id="vmax-v">255</span></div>
+        <input type="range" id="vmax" min="0" max="255" value="255">
+      </div>
+    </div>
+
+    <div class="code-box" id="code-out"></div>
+
+    <div class="tip" id="tip-out"></div>
+  </div>
+
+  <div class="canvases">
+    <div>
+      <div class="canvas-label">Synthetic scene (click to change)</div>
+      <canvas id="scene" height="160"></canvas>
+    </div>
+    <div>
+      <div class="canvas-label">HSV hue channel</div>
+      <canvas id="hue-canvas" height="160"></canvas>
+    </div>
+    <div>
+      <div class="canvas-label">Binary mask after inRange</div>
+      <canvas id="mask-canvas" height="160"></canvas>
+    </div>
+    <div class="coverage">Mask coverage: <span id="coverage">0%</span></div>
+  </div>
+</div>
+
+<script>
+const W = 400, H = 160;
+
+let sceneType = 0;
+
+function hsvToRgb(h, s, v) {
+  h = h / 179 * 360;
+  s = s / 255;
+  v = v / 255;
+  const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if      (h < 60)  { r=c; g=x; b=0; }
+  else if (h < 120) { r=x; g=c; b=0; }
+  else if (h < 180) { r=0; g=c; b=x; }
+  else if (h < 240) { r=0; g=x; b=c; }
+  else if (h < 300) { r=x; g=0; b=c; }
+  else              { r=c; g=0; b=x; }
+  return [(r+m)*255, (g+m)*255, (b+m)*255];
+}
+
+function rgbToHsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+  let h = 0, s = max === 0 ? 0 : d / max, v = max;
+  if (d !== 0) {
+    if      (max === r) h = ((g - b) / d + 6) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else                h = (r - g) / d + 4;
+    h *= 60;
+  }
+  return [Math.round(h / 360 * 179), Math.round(s * 255), Math.round(v * 255)];
+}
+
+function buildScene() {
+  const canvas = document.getElementById('scene');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  if (sceneType === 0) {
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0,   '#f5f5f0');
+    grad.addColorStop(1,   '#e8e0d0');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = '#8b6914';
+    ctx.beginPath(); ctx.ellipse(200, 80, 90, 50, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#a07820';
+    ctx.beginPath(); ctx.ellipse(200, 80, 85, 45, 0, 0, Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = '#c4a030';
+    ctx.beginPath(); ctx.roundRect(140, 58, 120, 44, 8); ctx.fill();
+    ctx.fillStyle = '#d4b040';
+    ctx.beginPath(); ctx.roundRect(142, 60, 116, 40, 6); ctx.fill();
+
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.beginPath(); ctx.ellipse(200, 130, 90, 15, 0, 0, Math.PI*2); ctx.fill();
+  } else if (sceneType === 1) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = 'rgba(200,220,240,0.3)';
+    ctx.beginPath(); ctx.roundRect(140, 55, 120, 50, 6); ctx.fill();
+    ctx.strokeStyle = 'rgba(180,200,220,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(140, 55, 120, 50, 6); ctx.stroke();
+
+    ctx.fillStyle = '#c4a030';
+    ctx.beginPath(); ctx.roundRect(155, 67, 90, 28, 4); ctx.fill();
+  } else {
+    ctx.fillStyle = '#fef3c7';
+    ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = ['#c4a030','#a07820','#8b6914'][i];
+      ctx.beginPath();
+      ctx.roundRect(40 + i*120, 55, 90, 50, 6); ctx.fill();
+    }
+  }
+
+  return canvas;
+}
+
+function applyThreshold() {
+  const hmin = +document.getElementById('hmin').value;
+  const hmax = +document.getElementById('hmax').value;
+  const smin = +document.getElementById('smin').value;
+  const smax = +document.getElementById('smax').value;
+  const vmin = +document.getElementById('vmin').value;
+  const vmax = +document.getElementById('vmax').value;
+
+  ['hmin-v','hmax-v','smin-v','smax-v','vmin-v','vmax-v'].forEach((id, i) => {
+    document.getElementById(id).textContent = [hmin,hmax,smin,smax,vmin,vmax][i];
+  });
+
+  const scene = document.getElementById('scene');
+  const ctx   = scene.getContext('2d');
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const d = imgData.data;
+
+  const hueCanvas = document.getElementById('hue-canvas');
+  hueCanvas.width = W; hueCanvas.height = H;
+  const hctx = hueCanvas.getContext('2d');
+  const hImgData = hctx.createImageData(W, H);
+
+  const maskCanvas = document.getElementById('mask-canvas');
+  maskCanvas.width = W; maskCanvas.height = H;
+  const mctx = maskCanvas.getContext('2d');
+  const mImgData = mctx.createImageData(W, H);
+
+  let white = 0, total = W * H;
+
+  for (let i = 0; i < total; i++) {
+    const r = d[i*4], g = d[i*4+1], b = d[i*4+2];
+    const [h, s, v] = rgbToHsv(r, g, b);
+
+    const [hr, hg, hb] = hsvToRgb(h, 200, 200);
+    hImgData.data[i*4]   = hr;
+    hImgData.data[i*4+1] = hg;
+    hImgData.data[i*4+2] = hb;
+    hImgData.data[i*4+3] = 255;
+
+    const inside = h>=hmin && h<=hmax && s>=smin && s<=smax && v>=vmin && v<=vmax;
+    mImgData.data[i*4]   = inside ? 255 : 20;
+    mImgData.data[i*4+1] = inside ? 255 : 20;
+    mImgData.data[i*4+2] = inside ? 255 : 20;
+    mImgData.data[i*4+3] = 255;
+    if (inside) white++;
+  }
+
+  hctx.putImageData(hImgData, 0, 0);
+  mctx.putImageData(mImgData, 0, 0);
+
+  const pct = (white / total * 100).toFixed(1);
+  document.getElementById('coverage').textContent = pct + '%';
+
+  document.getElementById('code-out').innerHTML =
+    `<span class="kw">lower</span> = np.array([<span class="val">${hmin}, ${smin}, ${vmin}</span>])\n` +
+    `<span class="kw">upper</span> = np.array([<span class="val">${hmax}, ${smax}, ${vmax}</span>])\n` +
+    `<span class="var">mask</span>  = cv2.inRange(<span class="var">hsv</span>, lower, upper)`;
+
+  const tip = pct > 20
+    ? 'Good coverage. Try narrowing H range to reduce false positives in background.'
+    : pct > 5
+    ? 'Some coverage detected. Widen the H range or lower S min if the mask is too sparse.'
+    : 'Very low coverage. The object may not match this hue range. Try H range 10-30 for golden-brown objects.';
+  document.getElementById('tip-out').textContent = tip;
+}
+
+document.getElementById('scene').addEventListener('click', () => {
+  sceneType = (sceneType + 1) % 3;
+  buildScene();
+  applyThreshold();
+});
+
+['hmin','hmax','smin','smax','vmin','vmax'].forEach(id => {
+  document.getElementById(id).addEventListener('input', applyThreshold);
+});
+
+buildScene();
+applyThreshold();
+</script>
+</body>
+</html>

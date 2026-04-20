@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 260" width="680" height="260">
+  <rect width="680" height="260" fill="#fafaf8"/>
+
+  <!-- Camera body -->
+  <rect x="30" y="110" width="50" height="40" rx="6" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="55" y="135" font-family="monospace" font-size="10" fill="#475569" text-anchor="middle">camera</text>
+
+  <!-- Optical axis (dashed) -->
+  <line x1="80" y1="130" x2="580" y2="130" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="5 4"/>
+
+  <!-- Image plane (vertical line) -->
+  <line x1="200" y1="50" x2="200" y2="210" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="200" y="42" font-family="monospace" font-size="10" fill="#64748b" text-anchor="middle">image plane</text>
+
+  <!-- Principal point cx,cy on image plane -->
+  <circle cx="200" cy="130" r="4" fill="#64748b"/>
+  <text x="212" y="127" font-family="monospace" font-size="10" fill="#64748b">cx, cy</text>
+
+  <!-- Pixel u,v on image plane (above cx,cy) -->
+  <circle cx="200" cy="85" r="5" fill="#ef4444"/>
+  <text x="212" y="88" font-family="monospace" font-size="10" fill="#ef4444">pixel (u, v)</text>
+
+  <!-- 3D point -->
+  <circle cx="500" cy="75" r="7" fill="#f59e0b"/>
+  <text x="515" y="72" font-family="monospace" font-size="11" fill="#92400e">3D point (X, Y, Z)</text>
+
+  <!-- Ray from camera through pixel to 3D point -->
+  <line x1="80" y1="130" x2="500" y2="75" stroke="#ef4444" stroke-width="1.5"/>
+
+  <!-- Depth Z (horizontal) -->
+  <line x1="200" y1="220" x2="500" y2="220" stroke="#475569" stroke-width="1" marker-end="url(#arrb)" marker-start="url(#arrb)"/>
+  <text x="350" y="238" font-family="monospace" font-size="11" fill="#475569" text-anchor="middle">Z  (depth in metres)</text>
+
+  <!-- u - cx offset (vertical) -->
+  <line x1="170" y1="85" x2="170" y2="130" stroke="#3b82f6" stroke-width="1" marker-end="url(#arrb)" marker-start="url(#arrb)"/>
+  <text x="155" y="110" font-family="monospace" font-size="10" fill="#1d4ed8" text-anchor="middle">u - cx</text>
+
+  <!-- X offset (vertical at 3D point) -->
+  <line x1="530" y1="75" x2="530" y2="130" stroke="#059669" stroke-width="1" marker-end="url(#arrb)" marker-start="url(#arrb)"/>
+  <text x="560" y="105" font-family="monospace" font-size="10" fill="#065f46">X</text>
+
+  <!-- Formula box -->
+  <rect x="220" y="158" width="240" height="56" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+  <text x="340" y="179" font-family="monospace" font-size="12" fill="#166534" text-anchor="middle">X = (u - cx) * Z / fx</text>
+  <text x="340" y="199" font-family="monospace" font-size="12" fill="#166534" text-anchor="middle">Y = (v - cy) * Z / fy</text>
+
+  <defs>
+    <marker id="arrb" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M1 1L9 5L1 9" fill="none" stroke="#475569" stroke-width="2"/>
+    </marker>
+  </defs>
+</svg>

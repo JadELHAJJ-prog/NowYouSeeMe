@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Back-Projection Explorer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; background: #fafaf8; color: #334155; padding: 24px; }
+  h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  p  { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+
+  .layout { display: grid; grid-template-columns: 300px 1fr; gap: 24px; }
+
+  .controls { display: flex; flex-direction: column; gap: 14px; }
+
+  .group { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; }
+  .group h3 { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+
+  .row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .row:last-child { margin-bottom: 0; }
+  .label { display: flex; justify-content: space-between; font-size: 12px; color: #475569; }
+  .label span { font-weight: 600; color: #0f172a; }
+  input[type=range] { width: 100%; height: 4px; accent-color: #6366f1; }
+
+  .result { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .card { background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; text-align: center; }
+  .card .cl { font-size: 10px; color: #94a3b8; margin-bottom: 4px; }
+  .card .cv { font-size: 18px; font-weight: 700; }
+  .cv.x { color: #ef4444; }
+  .cv.y { color: #22c55e; }
+  .cv.z { color: #3b82f6; }
+
+  .warn { background: #fef9c3; border: 1px solid #fde047; border-radius: 6px; padding: 8px 12px; font-size: 11px; color: #854d0e; display: none; }
+
+  canvas { border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; display: block; }
+
+  .formula { background: #1e293b; border-radius: 8px; padding: 12px; font-size: 12px; color: #94a3b8; line-height: 1.9; margin-top: 14px; }
+  .formula .hi { color: #86efac; }
+</style>
+</head>
+<body>
+
+<h1>Back-Projection Explorer</h1>
+<p>See how pixel coordinates and depth translate to a 3D point. From Chapter 4.</p>
+
+<div class="layout">
+  <div class="controls">
+
+    <div class="group">
+      <h3>Camera intrinsics</h3>
+      <div class="row">
+        <div class="label">fx (focal length) <span id="vfx">615</span></div>
+        <input type="range" id="fx" min="300" max="900" value="615" step="5">
+      </div>
+      <div class="row">
+        <div class="label">cx (principal point x) <span id="vcx">320</span></div>
+        <input type="range" id="cx" min="160" max="480" value="320">
+      </div>
+      <div class="row">
+        <div class="label">cy (principal point y) <span id="vcy">240</span></div>
+        <input type="range" id="cy" min="100" max="380" value="240">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Pixel coordinate</h3>
+      <div class="row">
+        <div class="label">u (column) <span id="vu">350</span></div>
+        <input type="range" id="pu" min="0" max="639" value="350">
+      </div>
+      <div class="row">
+        <div class="label">v (row) <span id="vv">280</span></div>
+        <input type="range" id="pv" min="0" max="479" value="280">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Depth</h3>
+      <div class="row">
+        <div class="label">Z in metres <span id="vz">0.45</span></div>
+        <input type="range" id="pz" min="5" max="150" value="45">
+      </div>
+    </div>
+
+    <div class="warn" id="warn">
+      Z looks very large. Did you forget to divide depth in mm by 1000?
+    </div>
+
+    <div class="result">
+      <div class="card"><div class="cl">X (metres)</div><div class="cv x" id="rx">0.000</div></div>
+      <div class="card"><div class="cl">Y (metres)</div><div class="cv y" id="ry">0.000</div></div>
+      <div class="card"><div class="cl">Z (metres)</div><div class="cv z" id="rz">0.000</div></div>
+    </div>
+
+    <div class="formula" id="formula-out"></div>
+  </div>
+
+  <canvas id="cv" height="380"></canvas>
+</div>
+
+<script>
+function update() {
+  const fx = +document.getElementById('fx').value;
+  const cx = +document.getElementById('cx').value;
+  const cy = +document.getElementById('cy').value;
+  const u  = +document.getElementById('pu').value;
+  const v  = +document.getElementById('pv').value;
+  const Z  = +document.getElementById('pz').value / 100;
+
+  document.getElementById('vfx').textContent = fx;
+  document.getElementById('vcx').textContent = cx;
+  document.getElementById('vcy').textContent = cy;
+  document.getElementById('vu').textContent  = u;
+  document.getElementById('vv').textContent  = v;
+  document.getElementById('vz').textContent  = Z.toFixed(2);
+
+  const fy = fx;
+  const X  = (u - cx) * Z / fx;
+  const Y  = (v - cy) * Z / fy;
+
+  document.getElementById('rx').textContent = X.toFixed(3);
+  document.getElementById('ry').textContent = Y.toFixed(3);
+  document.getElementById('rz').textContent = Z.toFixed(3);
+
+  document.getElementById('warn').style.display = Z > 5 ? 'block' : 'none';
+
+  document.getElementById('formula-out').innerHTML =
+    `X = (${u} - ${cx}) * ${Z.toFixed(2)} / ${fx} = <span class="hi">${X.toFixed(4)}</span>\n` +
+    `Y = (${v} - ${cy}) * ${Z.toFixed(2)} / ${fy} = <span class="hi">${Y.toFixed(4)}</span>\n` +
+    `Z = <span class="hi">${Z.toFixed(4)}</span>`;
+
+  draw(u, v, X, Y, Z, cx, cy);
+}
+
+function draw(u, v, X, Y, Z, cx, cy) {
+  const canvas = document.getElementById('cv');
+  const W = canvas.offsetWidth;
+  canvas.width  = W;
+  canvas.height = 380;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, 380);
+
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tc   = dark ? '#c2c0b6' : '#334155';
+  const gc   = dark ? '#2a2a28' : '#f1f5f9';
+
+  // Top view: X-Z plane
+  const TH = 180;
+  const PL = 50, PR = 20, PT = 30, PB = 20;
+  const cw = W - PL - PR;
+  const ch = TH - PT - PB;
+
+  ctx.fillStyle = gc;
+  ctx.fillRect(PL, PT, cw, ch);
+
+  const toX = xv => PL + (xv + 0.6) / 1.2 * cw;
+  const toZ = zv => PT + (1 - zv / 1.5) * ch;
+
+  for (let g = 0.2; g <= 1.4; g += 0.2) {
+    const py = toZ(g);
+    ctx.beginPath(); ctx.moveTo(PL, py); ctx.lineTo(PL+cw, py);
+    ctx.strokeStyle = dark ? '#3a3a38' : '#e2e8f0'; ctx.lineWidth = 0.5; ctx.stroke();
+    ctx.fillStyle = dark ? '#555' : '#94a3b8';
+    ctx.font = '10px monospace';
+    ctx.fillText(g.toFixed(1)+'m', 4, py + 4);
+  }
+
+  // Optical axis
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toZ(0));
+  ctx.lineTo(toX(0), toZ(1.5));
+  ctx.strokeStyle = dark ? '#3a3a38' : '#cbd5e1';
+  ctx.lineWidth = 1; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+
+  // Camera
+  ctx.fillStyle = '#6366f1';
+  ctx.beginPath(); ctx.arc(toX(0), toZ(0), 8, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = tc; ctx.font = '10px monospace';
+  ctx.fillText('cam', toX(0)+10, toZ(0)+4);
+
+  // Ray
+  const ptX = toX(X); const ptZ = toZ(Z);
+  ctx.beginPath();
+  ctx.moveTo(toX(0), toZ(0));
+  ctx.lineTo(ptX, ptZ);
+  ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // X offset line
+  ctx.beginPath(); ctx.moveTo(toX(0), ptZ); ctx.lineTo(ptX, ptZ);
+  ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 1; ctx.setLineDash([3,2]); ctx.stroke(); ctx.setLineDash([]);
+
+  // 3D point
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath(); ctx.arc(ptX, ptZ, 7, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = tc; ctx.font = '10px monospace';
+  ctx.fillText(`X=${X.toFixed(2)}`, ptX+10, ptZ-4);
+  ctx.fillText(`Z=${Z.toFixed(2)}`, ptX+10, ptZ+10);
+
+  ctx.fillStyle = tc; ctx.font = '11px monospace';
+  ctx.fillText('Top view (X-Z plane)', PL, PT - 8);
+
+  // Image plane visual
+  const IY = 220, IH = 130;
+  ctx.fillStyle = dark ? '#1e293b' : '#f8fafc';
+  ctx.fillRect(PL, IY, cw, IH);
+  ctx.strokeStyle = dark ? '#3a3a38' : '#e2e8f0';
+  ctx.lineWidth = 1; ctx.strokeRect(PL, IY, cw, IH);
+
+  ctx.fillStyle = tc; ctx.font = '11px monospace';
+  ctx.fillText('Image plane (640x480)', PL, IY - 8);
+
+  const ix = px => PL + (px / 640) * cw;
+  const iy = py => IY + (py / 480) * IH;
+
+  // Grid
+  for (let g = 0; g <= 640; g += 128) {
+    ctx.beginPath(); ctx.moveTo(ix(g), IY); ctx.lineTo(ix(g), IY+IH);
+    ctx.strokeStyle = dark ? '#2a2a28' : '#e2e8f0'; ctx.lineWidth = 0.5; ctx.stroke();
+  }
+  for (let g = 0; g <= 480; g += 96) {
+    ctx.beginPath(); ctx.moveTo(PL, iy(g)); ctx.lineTo(PL+cw, iy(g));
+    ctx.lineWidth = 0.5; ctx.stroke();
+  }
+
+  // Principal point
+  ctx.fillStyle = '#94a3b8';
+  ctx.beginPath(); ctx.arc(ix(cx), iy(cy), 4, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = tc; ctx.font = '9px monospace';
+  ctx.fillText('cx,cy', ix(cx)+6, iy(cy)+4);
+
+  // Pixel u,v
+  ctx.fillStyle = '#ef4444';
+  ctx.beginPath(); ctx.arc(ix(u), iy(v), 6, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = tc;
+  ctx.fillText(`(${u},${v})`, ix(u)+8, iy(v)-4);
+
+  // u-cx line
+  ctx.beginPath(); ctx.moveTo(ix(cx), iy(v)); ctx.lineTo(ix(u), iy(v));
+  ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#3b82f6';
+  ctx.fillText(`u-cx=${u-cx}`, ix((cx+u)/2)-20, iy(v)-6);
+}
+
+['fx','cx','cy','pu','pv','pz'].forEach(id => {
+  document.getElementById(id).addEventListener('input', update);
+});
+new ResizeObserver(update).observe(document.getElementById('cv'));
+update();
+</script>
+</body>
+</html>

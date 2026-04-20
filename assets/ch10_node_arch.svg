@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 260" width="680" height="260">
+  <rect width="680" height="260" fill="#fafaf8"/>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round"/>
+    </marker>
+    <marker id="b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round"/>
+    </marker>
+  </defs>
+
+  <!-- Camera source -->
+  <rect x="10" y="80" width="90" height="100" rx="6" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1"/>
+  <text x="55" y="104" font-family="monospace" font-size="10" fill="#334155" text-anchor="middle">RealSense</text>
+  <text x="55" y="119" font-family="monospace" font-size="10" fill="#475569" text-anchor="middle">D435</text>
+  <text x="55" y="148" font-family="monospace" font-size="9"  fill="#64748b" text-anchor="middle">30 Hz</text>
+
+  <!-- RGB topic -->
+  <line x1="100" y1="105" x2="165" y2="105" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#b)"/>
+  <text x="132" y="98" font-family="monospace" font-size="8" fill="#3b82f6" text-anchor="middle">/color/image</text>
+
+  <!-- Depth topic -->
+  <line x1="100" y1="155" x2="165" y2="155" stroke="#22c55e" stroke-width="1.5" marker-end="url(#g)"/>
+  <text x="132" y="168" font-family="monospace" font-size="8" fill="#22c55e" text-anchor="middle">/depth/image</text>
+
+  <!-- Sync box -->
+  <rect x="165" y="90" width="100" height="80" rx="6" fill="#ede9fe" stroke="#a78bfa" stroke-width="1"/>
+  <text x="215" y="114" font-family="monospace" font-size="9" fill="#5b21b6" text-anchor="middle">Approx Time</text>
+  <text x="215" y="128" font-family="monospace" font-size="9" fill="#5b21b6" text-anchor="middle">Synchronizer</text>
+  <text x="215" y="143" font-family="monospace" font-size="9" fill="#7c3aed" text-anchor="middle">slop=0.1s</text>
+  <text x="215" y="158" font-family="monospace" font-size="9" fill="#7c3aed" text-anchor="middle">queue=5</text>
+
+  <!-- Arrow to perception block -->
+  <line x1="265" y1="130" x2="295" y2="130" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="280" y="123" font-family="monospace" font-size="8" fill="#64748b" text-anchor="middle">matched</text>
+
+  <!-- Perception block -->
+  <rect x="295" y="50" width="185" height="180" rx="8" fill="#fef9c3" stroke="#fde047" stroke-width="1.5"/>
+  <text x="387" y="74" font-family="monospace" font-size="11" fill="#854d0e" text-anchor="middle">perception_cb</text>
+
+  <rect x="308" y="84"  width="160" height="26" rx="4" fill="#fef3c7" stroke="#fcd34d" stroke-width="0.5"/>
+  <text x="388" y="101" font-family="monospace" font-size="9" fill="#92400e" text-anchor="middle">cv_bridge decode</text>
+
+  <rect x="308" y="118" width="160" height="26" rx="4" fill="#fef3c7" stroke="#fcd34d" stroke-width="0.5"/>
+  <text x="388" y="135" font-family="monospace" font-size="9" fill="#92400e" text-anchor="middle">YOLO inference</text>
+
+  <rect x="308" y="152" width="160" height="26" rx="4" fill="#fef3c7" stroke="#fcd34d" stroke-width="0.5"/>
+  <text x="388" y="169" font-family="monospace" font-size="9" fill="#92400e" text-anchor="middle">conf gate (skip?)</text>
+
+  <rect x="308" y="186" width="160" height="26" rx="4" fill="#fef3c7" stroke="#fcd34d" stroke-width="0.5"/>
+  <text x="388" y="203" font-family="monospace" font-size="9" fill="#92400e" text-anchor="middle">mask to depth to pose</text>
+
+  <!-- Arrow to TF2 -->
+  <line x1="480" y1="165" x2="510" y2="165" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- TF2 box -->
+  <rect x="510" y="130" width="90" height="70" rx="6" fill="#dcfce7" stroke="#86efac" stroke-width="1"/>
+  <text x="555" y="155" font-family="monospace" font-size="9" fill="#166534" text-anchor="middle">TF2</text>
+  <text x="555" y="169" font-family="monospace" font-size="9" fill="#15803d" text-anchor="middle">camera</text>
+  <text x="555" y="183" font-family="monospace" font-size="9" fill="#15803d" text-anchor="middle">base_link</text>
+
+  <!-- Arrow to output -->
+  <line x1="600" y1="165" x2="628" y2="165" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- Output -->
+  <rect x="628" y="130" width="44" height="70" rx="6" fill="#dbeafe" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="650" y="157" font-family="monospace" font-size="8" fill="#1e40af" text-anchor="middle">Pose</text>
+  <text x="650" y="170" font-family="monospace" font-size="8" fill="#1e40af" text-anchor="middle">Stamped</text>
+  <text x="650" y="183" font-family="monospace" font-size="8" fill="#1e40af" text-anchor="middle">6-DOF</text>
+
+  <!-- camera_info subscription -->
+  <rect x="10" y="20" width="90" height="40" rx="5" fill="#f0f9ff" stroke="#7dd3fc" stroke-width="1"/>
+  <text x="55" y="36" font-family="monospace" font-size="9" fill="#0369a1" text-anchor="middle">camera_info</text>
+  <text x="55" y="50" font-family="monospace" font-size="8" fill="#0284c7" text-anchor="middle">once at startup</text>
+
+  <line x1="100" y1="40" x2="320" y2="88" stroke="#7dd3fc" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a)"/>
+  <text x="220" y="60" font-family="monospace" font-size="8" fill="#0369a1">fx fy cx cy</text>
+
+  <!-- Node rules at bottom -->
+  <rect x="10" y="215" width="660" height="38" rx="5" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="25" y="232" font-family="monospace" font-size="9" fill="#64748b">Rules:</text>
+  <text x="75" y="232" font-family="monospace" font-size="9" fill="#475569">never crash on empty frame</text>
+  <text x="75" y="246" font-family="monospace" font-size="9" fill="#475569">never block the spin loop</text>
+  <text x="290" y="232" font-family="monospace" font-size="9" fill="#475569">only publish above conf threshold</text>
+  <text x="290" y="246" font-family="monospace" font-size="9" fill="#475569">keep previous pose on miss</text>
+  <text x="530" y="232" font-family="monospace" font-size="9" fill="#475569">use original frame</text>
+  <text x="530" y="246" font-family="monospace" font-size="9" fill="#475569">timestamp for TF2</text>
+</svg>

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orientation and Cluster Explorer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; background: #fafaf8; color: #334155; padding: 24px; }
+  h1 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  p  { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tab { font-size: 12px; padding: 6px 14px; border-radius: 5px; cursor: pointer;
+         border: 1px solid #e2e8f0; background: white; color: #64748b; }
+  .tab.active { background: #1e293b; color: white; border-color: #1e293b; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .layout { display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
+  .controls { display: flex; flex-direction: column; gap: 14px; }
+  .group { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; }
+  .group h3 { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .row:last-child { margin-bottom: 0; }
+  .label { display: flex; justify-content: space-between; font-size: 12px; color: #475569; }
+  .label span { font-weight: 600; color: #0f172a; }
+  input[type=range] { width: 100%; height: 4px; accent-color: #6366f1; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; text-align: center; }
+  .stat .sl { font-size: 10px; color: #94a3b8; margin-bottom: 3px; }
+  .stat .sv { font-size: 15px; font-weight: 700; }
+
+  canvas { border-radius: 8px; border: 1px solid #e2e8f0; width: 100%; display: block; }
+  .info { font-size: 11px; color: #64748b; margin-top: 8px; background: #f8fafc; padding: 8px 12px; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<h1>Orientation and Cluster Explorer</h1>
+<p>Two tools: minAreaRect orientation (Chapter 3) and DBSCAN clustering (Chapter 5).</p>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab(0,this)">minAreaRect orientation</div>
+  <div class="tab" onclick="switchTab(1,this)">DBSCAN clustering</div>
+</div>
+
+<!-- Panel 0: orientation -->
+<div class="panel active" id="p0">
+  <div class="layout">
+    <div class="controls">
+      <div class="group">
+        <h3>Object shape</h3>
+        <div class="row">
+          <div class="label">Angle (deg) <span id="oa">-35</span></div>
+          <input type="range" id="angle" min="-90" max="0" value="-35">
+        </div>
+        <div class="row">
+          <div class="label">Aspect ratio <span id="oar">0.30</span></div>
+          <input type="range" id="ar" min="10" max="95" value="30">
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="sl">raw angle</div><div class="sv" id="raw-a">-35 deg</div></div>
+        <div class="stat"><div class="sl">corrected angle</div><div class="sv" id="cor-a">55 deg</div></div>
+        <div class="stat"><div class="sl">aspect ratio</div><div class="sv" id="st-ar">0.30</div></div>
+        <div class="stat"><div class="sl">shape class</div><div class="sv" id="st-cls" style="font-size:11px">elongated</div></div>
+      </div>
+
+      <div class="info" id="o-info"></div>
+    </div>
+    <canvas id="oc" height="280"></canvas>
+  </div>
+</div>
+
+<!-- Panel 1: DBSCAN -->
+<div class="panel" id="p1">
+  <div class="layout">
+    <div class="controls">
+      <div class="group">
+        <h3>DBSCAN parameters</h3>
+        <div class="row">
+          <div class="label">eps (cm) <span id="deps">2.0</span></div>
+          <input type="range" id="eps" min="5" max="80" value="20">
+        </div>
+        <div class="row">
+          <div class="label">min_points <span id="dmin">50</span></div>
+          <input type="range" id="dminp" min="5" max="150" value="50">
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="sl">clusters</div><div class="sv" id="dc">0</div></div>
+        <div class="stat"><div class="sl">noise pts</div><div class="sv" id="dn">0</div></div>
+        <div class="stat"><div class="sl">best Z</div><div class="sv" id="dbz">0.00</div></div>
+        <div class="stat"><div class="sl">pick target</div><div class="sv" id="dpick" style="font-size:11px; color:#166534">none</div></div>
+      </div>
+
+      <div class="info" id="d-info"></div>
+    </div>
+    <canvas id="dc-canvas" height="280"></canvas>
+  </div>
+</div>
+
+<script>
+function switchTab(n, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('p' + n).classList.add('active');
+  if (n === 0) drawOrientation();
+  else drawClusters();
+}
+
+// ---- Orientation ----
+function drawOrientation() {
+  const ang = +document.getElementById('angle').value;
+  const ar  = +document.getElementById('ar').value / 100;
+
+  document.getElementById('oa').textContent   = ang + ' deg';
+  document.getElementById('oar').textContent  = ar.toFixed(2);
+  document.getElementById('raw-a').textContent = ang + ' deg';
+
+  const corrected = ar < 0.5 ? ang + 90 : ang;
+  document.getElementById('cor-a').textContent = corrected.toFixed(0) + ' deg';
+  document.getElementById('st-ar').textContent = ar.toFixed(2);
+  document.getElementById('st-cls').textContent = ar < 0.4 ? 'elongated' : ar < 0.75 ? 'rectangular' : 'compact';
+
+  document.getElementById('o-info').textContent =
+    ar < 0.5
+      ? 'Width < height: add 90 to angle. Corrected angle = ' + corrected.toFixed(0) + ' deg. This is the long-axis orientation.'
+      : 'Width >= height: no correction needed. Angle = ' + ang + ' deg.';
+
+  const canvas = document.getElementById('oc');
+  const W = canvas.offsetWidth; canvas.width = W; canvas.height = 280;
+  const ctx = canvas.getContext('2d');
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tc = dark ? '#c2c0b6' : '#334155';
+  ctx.clearRect(0, 0, W, 280);
+
+  const cx = W/2, cy = 140;
+  const rad = ang * Math.PI / 180;
+  const L = 120, S = Math.round(L * ar);
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+
+  const corners = [[-L/2,-S/2],[L/2,-S/2],[L/2,S/2],[-L/2,S/2]].map(([x,y])=>[
+    cx + x*cos - y*sin,
+    cy + x*sin + y*cos
+  ]);
+  ctx.beginPath(); ctx.moveTo(corners[0][0],corners[0][1]);
+  corners.slice(1).forEach(c=>ctx.lineTo(c[0],c[1]));
+  ctx.closePath();
+  ctx.fillStyle = dark ? '#2a1f05' : '#fef9c3';
+  ctx.fill();
+  ctx.strokeStyle = '#d97706'; ctx.lineWidth = 2; ctx.stroke();
+
+  // Long axis
+  const lx1 = cx + (L/2+20)*cos, ly1 = cy + (L/2+20)*sin;
+  const lx0 = cx - (L/2+20)*cos, ly0 = cy - (L/2+20)*sin;
+  ctx.beginPath(); ctx.moveTo(lx0,ly0); ctx.lineTo(lx1,ly1);
+  ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.fillStyle = '#166534'; ctx.font = '10px monospace';
+  ctx.fillText('long axis', lx1+6, ly1+4);
+
+  // Gripper
+  const gL = 55, gW = 20, px2 = -sin, py2 = cos;
+  ctx.beginPath();
+  ctx.moveTo(cx-(gL*cos+gW*px2), cy-(gL*sin+gW*py2));
+  ctx.lineTo(cx+(gL*cos+gW*px2), cy+(gL*sin+gW*py2));
+  ctx.moveTo(cx-(gL*cos-gW*px2), cy-(gL*sin-gW*py2));
+  ctx.lineTo(cx+(gL*cos-gW*px2), cy+(gL*sin-gW*py2));
+  ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = '#1d4ed8'; ctx.fillText('gripper', cx+gL*cos+gW*px2+6, cy+gL*sin+gW*py2);
+
+  // Centroid
+  ctx.fillStyle = '#ef4444';
+  ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI*2); ctx.fill();
+
+  // Angle arc
+  ctx.beginPath(); ctx.arc(cx, cy, 38, -Math.PI/2, -Math.PI/2+rad, rad>0);
+  ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1.5; ctx.setLineDash([3,2]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = '#d97706'; ctx.fillText(ang+'deg', cx+42, cy-6);
+}
+
+// ---- DBSCAN ----
+let scenePts = [];
+
+function rnd(a,b){ return a+Math.random()*(b-a); }
+function genScene() {
+  const pts = [];
+  [[0.04, 0.38, 0.18, 0.12, 380], [-0.10, 0.30, 0.22, 0.07, 340], [0.12, 0.46, 0.09, 0.09, 180]].forEach((it,i)=>{
+    for(let j=0;j<it[4];j++) pts.push({x:it[0]+rnd(-it[2]/2,it[2]/2)+rnd(-0.004,0.004), z:it[1]+rnd(-it[3]/2,it[3]/2)+rnd(-0.004,0.004), truth:i});
+  });
+  for(let i=0;i<55;i++) pts.push({x:rnd(-0.22,0.22), z:rnd(0.22,0.6), truth:-1});
+  return pts;
+}
+
+function dbscan(pts, eps, minPts) {
+  const labels = new Array(pts.length).fill(-2);
+  let cid = 0;
+  function nb(i){ return pts.reduce((a,p,j)=>{ const dx=pts[i].x-p.x,dz=pts[i].z-p.z; if(Math.sqrt(dx*dx+dz*dz)<=eps) a.push(j); return a; },[]); }
+  for(let i=0;i<pts.length;i++){
+    if(labels[i]!==-2) continue;
+    const n=nb(i);
+    if(n.length<minPts){labels[i]=-1;continue;}
+    labels[i]=cid;
+    const seeds=[...n];
+    for(let si=0;si<seeds.length;si++){
+      const s=seeds[si];
+      if(labels[s]===-1) labels[s]=cid;
+      if(labels[s]!==-2) continue;
+      labels[s]=cid;
+      const sn=nb(s);
+      if(sn.length>=minPts) sn.forEach(x=>{if(!seeds.includes(x))seeds.push(x);});
+    }
+    cid++;
+  }
+  return labels;
+}
+
+const COLS = ['#1D9E75','#378ADD','#BA7517','#D85A30','#534AB7'];
+
+function drawClusters() {
+  const epsV  = +document.getElementById('eps').value / 100;
+  const minP  = +document.getElementById('dminp').value;
+  document.getElementById('deps').textContent = (+document.getElementById('eps').value/10).toFixed(1);
+  document.getElementById('dmin').textContent = minP;
+
+  const sample = scenePts.filter((_,i)=>i%3===0);
+  const labels = dbscan(sample, epsV, Math.max(3, Math.floor(minP/3)));
+
+  const nC = Math.max(0, Math.max(...labels)+1);
+  const nN = labels.filter(l=>l===-1).length;
+
+  const centroids = [];
+  for(let c=0;c<nC;c++){
+    const cp = sample.filter((_,i)=>labels[i]===c);
+    if(!cp.length) continue;
+    centroids.push({id:c, z:cp.reduce((s,p)=>s+p.z,0)/cp.length, x:cp.reduce((s,p)=>s+p.x,0)/cp.length, n:cp.length});
+  }
+  const best = centroids.length ? centroids.reduce((a,b)=>a.z>b.z?a:b) : null;
+
+  document.getElementById('dc').textContent = nC;
+  document.getElementById('dn').textContent = nN;
+  document.getElementById('dbz').textContent = best ? best.z.toFixed(3)+'m' : '--';
+  document.getElementById('dpick').textContent = best ? `cluster ${best.id}` : 'none';
+
+  const info = epsV > 0.06
+    ? 'eps too large: nearby objects may be merging into one cluster. Try decreasing eps.'
+    : epsV < 0.01
+    ? 'eps too small: one object may split into several clusters. Try increasing eps.'
+    : best ? `Best pick: cluster ${best.id} at Z=${best.z.toFixed(3)}m (highest centroid = topmost object).`
+    : 'No valid clusters found.';
+  document.getElementById('d-info').textContent = info;
+
+  const canvas = document.getElementById('dc-canvas');
+  const W = canvas.offsetWidth; canvas.width = W; canvas.height = 280;
+  const ctx = canvas.getContext('2d');
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tc   = dark ? '#c2c0b6' : '#334155';
+  ctx.clearRect(0, 0, W, 280);
+
+  const cx2 = W/2, cz0 = 20;
+  const scX = W / 0.55, scZ = 240 / 0.55;
+
+  sample.forEach((p,i)=>{
+    const label = labels[i];
+    const col = label===-1 ? '#888780' : COLS[label%COLS.length];
+    const px = cx2+p.x*scX, pz = cz0+(p.z-0.2)*scZ;
+    ctx.beginPath(); ctx.arc(px,pz, label===-1?1.5:3, 0, Math.PI*2);
+    ctx.fillStyle = col; ctx.globalAlpha = label===-1?0.3:0.7; ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  if(best){
+    const bx=cx2+best.x*scX, bz=cz0+(best.z-0.2)*scZ;
+    ctx.beginPath(); ctx.arc(bx,bz,10,0,Math.PI*2);
+    ctx.strokeStyle='#ef4444'; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx,bz,4,0,Math.PI*2);
+    ctx.fillStyle='#ef4444'; ctx.fill();
+    ctx.fillStyle=tc; ctx.font='10px monospace';
+    ctx.fillText('pick first', bx+12, bz+4);
+  }
+
+  // Z axis labels
+  for(let z=0.2;z<=0.7;z+=0.1){
+    const py=cz0+(z-0.2)*scZ;
+    ctx.fillStyle=dark?'#555':'#94a3b8';
+    ctx.font='9px monospace';
+    ctx.fillText(z.toFixed(1)+'m', 3, py+4);
+  }
+}
+
+document.getElementById('angle').addEventListener('input', drawOrientation);
+document.getElementById('ar').addEventListener('input', drawOrientation);
+document.getElementById('eps').addEventListener('input', drawClusters);
+document.getElementById('dminp').addEventListener('input', drawClusters);
+
+scenePts = genScene();
+drawOrientation();
+new ResizeObserver(() => {
+  drawOrientation();
+  if(document.getElementById('p1').classList.contains('active')) drawClusters();
+}).observe(document.getElementById('oc'));
+</script>
+</body>
+</html>
